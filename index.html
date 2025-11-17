@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Secure Redirect</title>
+<style>
+body { font-family: Arial,sans-serif; background: #f8f9fa; display:flex; align-items:center; justify-content:center; height:100vh; margin:0;}
+.container { background:#fff; padding:30px; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.1); text-align:center; }
+button { padding:10px 20px; border:none; border-radius:6px; background:#0366d6; color:#fff; cursor:pointer; }
+</style>
+
+<!-- Cloudflare Turnstile -->
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+<body>
+
+<div class="container">
+  <h2>Secure Redirect</h2>
+  <p>Click below and complete verification to continue.</p>
+  <div id="form-container"></div>
+</div>
+
+<script>
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const targetId = params.get('target');
+  if(!targetId){
+    document.getElementById('form-container').innerHTML = "<p style='color:red;'>No target specified.</p>";
+    return;
+  }
+
+  // Request a temporary click-token from the server
+  const tokenResponse = await fetch(`/api/get-token?target=${encodeURIComponent(targetId)}`);
+  if(!tokenResponse.ok) {
+    document.getElementById('form-container').innerHTML = "<p style='color:red;'>Failed to get token.</p>";
+    return;
+  }
+  const { clickToken } = await tokenResponse.json();
+
+  // Create form for Turnstile + token submission
+  const formHTML = `
+    <form id="verifyForm" method="POST" action="/api/verify">
+      <input type="hidden" name="token" value="${clickToken}" />
+      <div class="cf-turnstile" data-sitekey="YOUR_SITE_KEY"></div>
+      <br/>
+      <button type="submit" id="continueBtn" disabled>Continue</button>
+    </form>
+  `;
+  document.getElementById('form-container').innerHTML = formHTML;
+
+  const continueBtn = document.getElementById('continueBtn');
+
+  // Turnstile callback
+  window.onTurnstileSuccess = function() {
+    continueBtn.disabled = false;
+    continueBtn.textContent = "Verified! Click to continue";
+  };
+
+  // Optional: prevent multiple submissions
+  document.getElementById('verifyForm').addEventListener('submit', e => {
+    continueBtn.disabled = true;
+    continueBtn.textContent = "Redirecting...";
+  });
+}
+
+init();
+</script>
+
+</body>
+</html>
